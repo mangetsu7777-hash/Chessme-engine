@@ -1,0 +1,12 @@
+{
+  "name": "chessme-engine-server",
+  "version": "1.0.0",
+  "description": "Chessme engine server — runs Stockfish binary at depth 18",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

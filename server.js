@@ -11,16 +11,19 @@
 
 const http       = require('http');
 const { spawn }  = require('child_process');
-const { execSync } = require('child_process');
 
 const PORT       = process.env.PORT || 3000;
-const DEPTH      = parseInt(process.env.DEPTH) || 18;
+const DEPTH      = parseInt(process.env.DEPTH) || 20;
+const THREADS    = parseInt(process.env.THREADS) || 2;
 const CACHE_SIZE = 200_000; // in-memory LRU cache
+
+const fs = require('fs');
 
 // ── Find Stockfish binary ─────────────────────────────────────────────────────
 function findStockfish() {
   const candidates = [
     process.env.STOCKFISH_PATH,
+    './stockfish-bin',
     '/usr/games/stockfish',
     '/usr/local/bin/stockfish',
     '/usr/bin/stockfish',
@@ -29,8 +32,12 @@ function findStockfish() {
   ].filter(Boolean);
 
   for (const p of candidates) {
-    try { execSync(`${p} quit`, { timeout: 2000, stdio: 'pipe' }); return p; }
-    catch {}
+    try {
+      // Check file exists and is executable
+      fs.accessSync(p, fs.constants.X_OK);
+      console.log(`[Engine] Found Stockfish at: ${p}`);
+      return p;
+    } catch {}
   }
   throw new Error('Stockfish binary not found. Install with: apt-get install stockfish');
 }
@@ -88,8 +95,8 @@ class StockfishEngine {
     });
 
     this._send('uci');
-    this._send('setoption name Hash value 128');
-    this._send('setoption name Threads value 1');
+    this._send('setoption name Hash value 256');
+    this._send(`setoption name Threads value ${THREADS}`);
     this._send('isready');
   }
 
@@ -150,7 +157,7 @@ class StockfishEngine {
           this._send('stop');
         }
         reject(new Error('Timeout'));
-      }, 10_000);
+      }, 15_000);
 
       this.queue.push({
         fen, depth,
@@ -183,7 +190,7 @@ http.createServer(async (req, res) => {
 
   // Health check
   if (req.method === 'GET' && req.url === '/health') {
-    jsonRes(res, { ok: true, engine: 'stockfish', depth: DEPTH, cacheSize: _cache.size });
+    jsonRes(res, { ok: true, engine: 'stockfish', depth: DEPTH, threads: THREADS, cacheSize: _cache.size });
     return;
   }
 
@@ -232,6 +239,6 @@ http.createServer(async (req, res) => {
   jsonRes(res, { error: 'Not found' }, 404);
 }).listen(PORT, () => {
   console.log(`[Server] Listening on port ${PORT}`);
-  console.log(`[Server] Default depth: ${DEPTH}`);
+  console.log(`[Server] Default depth: ${DEPTH} | Threads: ${THREADS}`);
   console.log(`[Server] Cache size: ${CACHE_SIZE} positions`);
 });

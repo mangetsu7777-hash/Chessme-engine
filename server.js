@@ -1,5 +1,5 @@
 //**
- * Chessme Engine Server v2 — Production-ready
+ * Chessme Engine Server v3 — Production-ready
  *
  * Optimisations over v1:
  *   - Dual Stockfish process pool (2× throughput)
@@ -12,13 +12,21 @@
  *   - Warmup: engine runs dummy position on startup before accepting requests
  *   - Depth cap: respects requested depth, caps at 20
  *
+ * Optimisations over v2:
+ *   - No hash table flush between positions (ucinewgame removed from eval path)
+ *   - Batched Supabase lookups (single request per /eval call)
+ *   - Gzip compression for /eval responses
+ *   - Movetime cap per position to bound worst-case latency
+ *   - POST /warmup endpoint for pre-heating engines
+ *
  * Environment variables:
- *   PORT, DEPTH (default 18), HASH (default 64MB), THREADS_PER_ENGINE (default 1)
+ *   PORT, DEPTH (default 18), HASH (default 128MB), THREADS_PER_ENGINE (default 1)
  *   SUPABASE_URL, SUPABASE_ANON_KEY  — for eval_cache read/write
  *   REQUIRE_AUTH (true/false)        — reject unauthenticated requests
  *   RAILWAY_PUBLIC_DOMAIN            — set by Railway, used for keepalive
  *   MAX_QUEUE (default 40)           — reject if queue exceeds this
  *   RATE_LIMIT_PER_MIN (default 60)  — positions per IP per minute
+ *   MOVETIME_CAP_MS (default 4000)   — max ms per position search
  */
 
 'use strict';
@@ -27,18 +35,20 @@ const http       = require('http');
 const https      = require('https');
 const { spawn }  = require('child_process');
 const fs         = require('fs');
+const zlib       = require('zlib');
 
 const PORT              = process.env.PORT                   || 3000;
 const DEFAULT_DEPTH     = parseInt(process.env.DEPTH)        || 18;
-const HASH_MB           = parseInt(process.env.HASH)         || 64;
+const HASH_MB           = parseInt(process.env.HASH)         || 128;
 const THREADS_PER_ENG   = parseInt(process.env.THREADS_PER_ENGINE) || 1;
 const MAX_QUEUE         = parseInt(process.env.MAX_QUEUE)    || 40;
 const RATE_PER_MIN      = parseInt(process.env.RATE_LIMIT_PER_MIN) || 60;
 const REQUIRE_AUTH      = process.env.REQUIRE_AUTH === 'true';
 const SUPABASE_URL      = process.env.SUPABASE_URL      || '';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
+const MOVETIME_CAP_MS   = parseInt(process.env.MOVETIME_CAP_MS) || 4000;
 const NUM_ENGINES       = 2;
-const LOCAL_CACHE_SIZE  = 150_000;
+const LOCAL_CACHE_SIZE  = 200_000;
 
 function findStockfish() {
   const paths = [
@@ -68,16 +78,19 @@ function cacheKey(fen, depth) {
   return fen.split(' ').slice(0, 4).join(' ') + `@d${depth}`;
 }
 
-async function supabaseGet(fenKey) {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return null;
+async function supabaseBatchGet(fenKeys) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !fenKeys.length) return new Map();
   try {
-    const url = `${SUPABASE_URL}/rest/v1/eval_cache?fen_key=eq.${encodeURIComponent(fenKey)}&select=cp,mate,depth&limit=1`;
+    const filter = fenKeys.map(k => encodeURIComponent(k)).join(',');
+    const url = `${SUPABASE_URL}/rest/v1/eval_cache?fen_key=in.(${filter})&select=fen_key,cp,mate,depth`;
     const data = await httpsGet(url, {
       'apikey': SUPABASE_ANON_KEY,
       'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
     });
-    return data?.[0] || null;
-  } catch { return null; }
+    const map = new Map();
+    if (Array.isArray(data)) data.forEach(row => map.set(row.fen_key, row));
+    return map;
+  } catch { return new Map(); }
 }
 
 async function supabaseSet(fenKey, cp, mate, depth) {
@@ -188,14 +201,13 @@ class Engine {
         this.current = null; this.busy = false;
         reject(new Error('Engine timeout'));
         pool.drain();
-      }, depth * 1200 + 4000);
+      }, depth * 500 + 3000);
 
       this.busy    = true;
       this.current = { fen, bestCp: null, bestMate: null,
         resolve: r => { clearTimeout(timer); resolve(r); } };
-      this._send('ucinewgame');
       this._send(`position fen ${fen}`);
-      this._send(`go depth ${depth}`);
+      this._send(`go depth ${depth} movetime ${MOVETIME_CAP_MS}`);
     });
   }
 }
@@ -285,13 +297,30 @@ http.createServer(async (req, res) => {
 
   if (req.method === 'GET' && req.url === '/health') {
     json(res, {
-      ok: true, engines: NUM_ENGINES,
+      ok: true, version: 3, engines: NUM_ENGINES,
       ready: pool.engines.filter(e => e.ready).length,
       busy:  pool.engines.filter(e => e.busy).length,
       queue: pool.queueDepth,
       cache: _lru.size,
       depth: DEFAULT_DEPTH,
+      hash:  HASH_MB,
     });
+    return;
+  }
+
+  if (req.method === 'POST' && req.url === '/warmup') {
+    const warmupPositions = [
+      'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
+      'rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
+    ];
+    // Fire-and-forget: run each position at depth 8 on every engine
+    (async () => {
+      for (const fen of warmupPositions) {
+        try { await pool.eval(fen, 8); } catch {}
+      }
+    })();
+    json(res, { ok: true, warming: warmupPositions.length });
     return;
   }
 
@@ -321,13 +350,18 @@ http.createServer(async (req, res) => {
           return json(res, { error: 'Server overloaded — use local engine', overloaded: true }, 503);
         }
 
-        const results = await Promise.all(fens.map(async fen => {
-          const key = cacheKey(fen, depth);
+        // Batch Supabase lookup for all FENs not already in local cache
+        const keys = fens.map(fen => cacheKey(fen, depth));
+        const missKeys = keys.filter(k => !lruGet(k));
+        const dbMap = await supabaseBatchGet(missKeys);
+
+        const results = await Promise.all(fens.map(async (fen, i) => {
+          const key = keys[i];
 
           const hit = lruGet(key);
           if (hit) return { ...hit, cached: 'local' };
 
-          const dbHit = await supabaseGet(key);
+          const dbHit = dbMap.get(key);
           if (dbHit && dbHit.depth >= depth) {
             lruSet(key, dbHit);
             return { ...dbHit, cached: 'db' };
@@ -344,7 +378,21 @@ http.createServer(async (req, res) => {
           }
         }));
 
-        json(res, { results });
+        const payload = JSON.stringify({ results });
+        const acceptEncoding = req.headers['accept-encoding'] || '';
+        if (acceptEncoding.includes('gzip')) {
+          zlib.gzip(payload, (err, compressed) => {
+            if (err) { json(res, { results }); return; }
+            res.writeHead(200, {
+              ...CORS,
+              'Content-Type': 'application/json',
+              'Content-Encoding': 'gzip',
+            });
+            res.end(compressed);
+          });
+        } else {
+          json(res, { results });
+        }
       } catch (e) {
         json(res, { error: e.message }, 500);
       }
@@ -354,7 +402,7 @@ http.createServer(async (req, res) => {
 
   json(res, { error: 'Not found' }, 404);
 }).listen(PORT, () => {
-  console.log(`[Server] v2 listening on :${PORT}`);
+  console.log(`[Server] v3 listening on :${PORT}`);
   console.log(`[Server] ${NUM_ENGINES} engines · depth ${DEFAULT_DEPTH} · hash ${HASH_MB}MB · queue limit ${MAX_QUEUE}`);
   console.log(`[Server] Supabase cache: ${SUPABASE_URL ? 'enabled' : 'disabled'}`);
   console.log(`[Server] Auth required: ${REQUIRE_AUTH}`);

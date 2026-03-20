@@ -21,15 +21,15 @@ const fs      = require('fs');
 
 const PORT            = process.env.PORT                      || 3000;
 const DEFAULT_DEPTH   = parseInt(process.env.DEPTH)           || 18;
-const HASH_MB         = parseInt(process.env.HASH)            || 512;  // 8GB RAM → big hash
-const THREADS_PER_ENG = parseInt(process.env.THREADS_PER_ENGINE) || 2; // 8 vCPUs ÷ 4 engines
-const MAX_QUEUE       = parseInt(process.env.MAX_QUEUE)       || 200;  // large burst capacity
-const MOVETIME_CAP    = parseInt(process.env.MOVETIME_CAP_MS) || 2000; // faster, still accurate
+const HASH_MB         = parseInt(process.env.HASH)            || 256;  // 3×256MB = 768MB total
+const THREADS_PER_ENG = parseInt(process.env.THREADS_PER_ENGINE) || 2;
+const MAX_QUEUE       = parseInt(process.env.MAX_QUEUE)       || 100;
+const MOVETIME_CAP    = parseInt(process.env.MOVETIME_CAP_MS) || 2000;
 const REQUIRE_AUTH    = process.env.REQUIRE_AUTH === 'true';
 const SUPABASE_URL    = process.env.SUPABASE_URL      || '';
 const SUPABASE_KEY    = process.env.SUPABASE_ANON_KEY || '';
-const NUM_ENGINES     = parseInt(process.env.NUM_ENGINES) || 4; // 4 parallel engines
-const LOCAL_CACHE     = 500_000; // 500k positions in LRU — plenty of RAM
+const NUM_ENGINES     = parseInt(process.env.NUM_ENGINES) || 2; // 2 per replica × 3 replicas = 6 total
+const LOCAL_CACHE     = 300_000;
 
 // ── Stockfish path ─────────────────────────────────────────────────────────────
 function findStockfish() {
@@ -448,9 +448,8 @@ http.createServer(async (req, res) => {
   json(res, { error: 'Not found' }, 404);
 
 }).listen(PORT, () => {
-  console.log(`[Server] v3.1 (Hobby) listening on :${PORT}`);
+  console.log(`[Server] v3.1 (replica) listening on :${PORT}`);
   console.log(`[Server] ${NUM_ENGINES} engines × ${THREADS_PER_ENG} threads · depth ${DEFAULT_DEPTH} · hash ${HASH_MB}MB`);
   console.log(`[Server] queue limit ${MAX_QUEUE} · movetime cap ${MOVETIME_CAP}ms · rate limit OFF`);
   console.log(`[Server] Supabase cache: ${SUPABASE_URL ? 'enabled (batch mode)' : 'disabled'}`);
-  console.log(`[Server] Auth: ${REQUIRE_AUTH ? 'required' : 'open'}`);
 });

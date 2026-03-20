@@ -21,15 +21,15 @@ const fs      = require('fs');
 
 const PORT            = process.env.PORT                      || 3000;
 const DEFAULT_DEPTH   = parseInt(process.env.DEPTH)           || 18;
-const HASH_MB         = parseInt(process.env.HASH)            || 256;  // 3×256MB = 768MB total
-const THREADS_PER_ENG = parseInt(process.env.THREADS_PER_ENGINE) || 2;
-const MAX_QUEUE       = parseInt(process.env.MAX_QUEUE)       || 100;
-const MOVETIME_CAP    = parseInt(process.env.MOVETIME_CAP_MS) || 2000;
+const HASH_MB         = parseInt(process.env.HASH)            || 32;   // safe for Railway Hobby $5
+const THREADS_PER_ENG = parseInt(process.env.THREADS_PER_ENGINE) || 1;
+const MAX_QUEUE       = parseInt(process.env.MAX_QUEUE)       || 20;
+const MOVETIME_CAP    = parseInt(process.env.MOVETIME_CAP_MS) || 3000;
 const REQUIRE_AUTH    = process.env.REQUIRE_AUTH === 'true';
 const SUPABASE_URL    = process.env.SUPABASE_URL      || '';
 const SUPABASE_KEY    = process.env.SUPABASE_ANON_KEY || '';
-const NUM_ENGINES     = parseInt(process.env.NUM_ENGINES) || 2; // 2 per replica × 3 replicas = 6 total
-const LOCAL_CACHE     = 300_000;
+const NUM_ENGINES     = parseInt(process.env.NUM_ENGINES) || 1;
+const LOCAL_CACHE     = 50_000;
 
 // ── Stockfish path ─────────────────────────────────────────────────────────────
 function findStockfish() {

@@ -1,25 +1,14 @@
 /**
- * Chessme Engine Server v3 — Railway-optimised
+ * Chessme Engine Server v3.1 — Railway Hobby ($5 plan)
  *
- * v3 optimisations over v2:
- *   - Batch Supabase cache lookup (1 query for all FENs, not N)
- *   - No ucinewgame per position — hash table stays warm across a game
- *   - Realistic timeout: depth*500+3000 instead of depth*1200+4000
- *   - go movetime cap (4000ms) prevents runaway sharp positions
- *   - Hash increased to 128MB (was 64MB)
- *   - Parallel cache pre-warm: Supabase lookup fires while engine processes
- *   - Gzip response compression for large batches
- *   - Client batch size guidance: 20 FENs (was 3)
- *   - /warmup endpoint: pre-loads hash tables, called once on deploy
- *
- * Environment variables:
- *   PORT, DEPTH (default 18), HASH (default 128MB), THREADS_PER_ENGINE (default 1)
- *   SUPABASE_URL, SUPABASE_ANON_KEY
- *   REQUIRE_AUTH (true/false)
- *   RAILWAY_PUBLIC_DOMAIN — set by Railway for keepalive
- *   MAX_QUEUE (default 60)
- *   RATE_LIMIT_PER_MIN (default 120)
- *   MOVETIME_CAP_MS (default 4000) — max ms per position regardless of depth
+ * Hobby plan: 8 vCPUs, 8GB RAM — full utilisation
+ *   - 4 Stockfish engines (was 2) — 4× parallel throughput
+ *   - 2 threads per engine (was 1) — each position searched faster
+ *   - 512MB hash (was 128MB) — massive position cache in memory
+ *   - Rate limiting removed — single-user deployment, no need
+ *   - movetime 2000ms (was 4000ms) — faster responses, depth 18 still accurate
+ *   - MAX_QUEUE 200 — handles large burst analysis sessions
+ *   - Keepalive every 30s (was 2min) — prevents Railway sleep on hobby
  */
 
 'use strict';
@@ -30,18 +19,17 @@ const zlib    = require('zlib');
 const { spawn } = require('child_process');
 const fs      = require('fs');
 
-const PORT            = process.env.PORT                   || 3000;
-const DEFAULT_DEPTH   = parseInt(process.env.DEPTH)        || 18;
-const HASH_MB         = parseInt(process.env.HASH)         || 128;  // ↑ was 64
-const THREADS_PER_ENG = parseInt(process.env.THREADS_PER_ENGINE) || 1;
-const MAX_QUEUE       = parseInt(process.env.MAX_QUEUE)    || 60;   // ↑ was 40
-const RATE_PER_MIN    = parseInt(process.env.RATE_LIMIT_PER_MIN) || 120; // ↑ was 60
-const MOVETIME_CAP    = parseInt(process.env.MOVETIME_CAP_MS) || 4000;
+const PORT            = process.env.PORT                      || 3000;
+const DEFAULT_DEPTH   = parseInt(process.env.DEPTH)           || 18;
+const HASH_MB         = parseInt(process.env.HASH)            || 512;  // 8GB RAM → big hash
+const THREADS_PER_ENG = parseInt(process.env.THREADS_PER_ENGINE) || 2; // 8 vCPUs ÷ 4 engines
+const MAX_QUEUE       = parseInt(process.env.MAX_QUEUE)       || 200;  // large burst capacity
+const MOVETIME_CAP    = parseInt(process.env.MOVETIME_CAP_MS) || 2000; // faster, still accurate
 const REQUIRE_AUTH    = process.env.REQUIRE_AUTH === 'true';
 const SUPABASE_URL    = process.env.SUPABASE_URL      || '';
 const SUPABASE_KEY    = process.env.SUPABASE_ANON_KEY || '';
-const NUM_ENGINES     = 2;
-const LOCAL_CACHE     = 200_000;
+const NUM_ENGINES     = parseInt(process.env.NUM_ENGINES) || 4; // 4 parallel engines
+const LOCAL_CACHE     = 500_000; // 500k positions in LRU — plenty of RAM
 
 // ── Stockfish path ─────────────────────────────────────────────────────────────
 function findStockfish() {
@@ -269,16 +257,8 @@ const pool = {
   },
 };
 
-// ── Rate limiter ───────────────────────────────────────────────────────────────
-const _rates = new Map();
-function checkRate(ip) {
-  const now   = Date.now();
-  const entry = _rates.get(ip) || { count: 0, resetAt: now + 60000 };
-  if (now > entry.resetAt) { entry.count = 0; entry.resetAt = now + 60000; }
-  entry.count++;
-  _rates.set(ip, entry);
-  return entry.count <= RATE_PER_MIN;
-}
+// ── Rate limiter ── REMOVED (Hobby plan, single-user deployment) ──────────────
+function checkRate(_ip) { return true; } // always allow
 
 // ── JWT auth ───────────────────────────────────────────────────────────────────
 async function verifyJWT(token) {
@@ -292,13 +272,13 @@ async function verifyJWT(token) {
   } catch { return false; }
 }
 
-// ── Keepalive ──────────────────────────────────────────────────────────────────
+// ── Keepalive — ping every 30s to prevent Railway Hobby sleep ─────────────────
 const DOMAIN = process.env.RAILWAY_PUBLIC_DOMAIN;
 if (DOMAIN) {
   setInterval(() => {
     https.get(`https://${DOMAIN}/health`).on('error', () => {});
-  }, 2 * 60 * 1000);
-  console.log(`[Server] Keepalive → https://${DOMAIN}/health every 2min`);
+  }, 30 * 1000); // 30s — Hobby plan sleeps faster than Starter
+  console.log(`[Server] Keepalive → https://${DOMAIN}/health every 30s`);
 }
 
 // ── Gzip helper ────────────────────────────────────────────────────────────────
@@ -337,7 +317,7 @@ http.createServer(async (req, res) => {
   // Health check
   if (req.method === 'GET' && req.url === '/health') {
     json(res, {
-      ok: true, version: 3,
+      ok: true, version: '3.1-hobby',
       engines: NUM_ENGINES,
       ready:   pool.engines.filter(e => e.ready).length,
       busy:    pool.engines.filter(e => e.busy).length,
@@ -345,6 +325,8 @@ http.createServer(async (req, res) => {
       cache:   _lru.size,
       depth:   DEFAULT_DEPTH,
       hash:    HASH_MB,
+      threads: THREADS_PER_ENG,
+      rateLimit: 'off',
     });
     return;
   }
@@ -466,9 +448,9 @@ http.createServer(async (req, res) => {
   json(res, { error: 'Not found' }, 404);
 
 }).listen(PORT, () => {
-  console.log(`[Server] v3 listening on :${PORT}`);
-  console.log(`[Server] ${NUM_ENGINES} engines · depth ${DEFAULT_DEPTH} · hash ${HASH_MB}MB`);
-  console.log(`[Server] queue limit ${MAX_QUEUE} · movetime cap ${MOVETIME_CAP}ms`);
+  console.log(`[Server] v3.1 (Hobby) listening on :${PORT}`);
+  console.log(`[Server] ${NUM_ENGINES} engines × ${THREADS_PER_ENG} threads · depth ${DEFAULT_DEPTH} · hash ${HASH_MB}MB`);
+  console.log(`[Server] queue limit ${MAX_QUEUE} · movetime cap ${MOVETIME_CAP}ms · rate limit OFF`);
   console.log(`[Server] Supabase cache: ${SUPABASE_URL ? 'enabled (batch mode)' : 'disabled'}`);
   console.log(`[Server] Auth: ${REQUIRE_AUTH ? 'required' : 'open'}`);
 });

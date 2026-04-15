@@ -1,0 +1,478 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "label": "server.js",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L1",
+      "id": "server_js",
+      "community": 0,
+      "norm_label": "server.js"
+    },
+    {
+      "label": "findStockfish()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L44",
+      "id": "server_findstockfish",
+      "community": 0,
+      "norm_label": "findstockfish()"
+    },
+    {
+      "label": "lruGet()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L61",
+      "id": "server_lruget",
+      "community": 0,
+      "norm_label": "lruget()"
+    },
+    {
+      "label": "lruSet()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L65",
+      "id": "server_lruset",
+      "community": 0,
+      "norm_label": "lruset()"
+    },
+    {
+      "label": "cacheKey()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L69",
+      "id": "server_cachekey",
+      "community": 0,
+      "norm_label": "cachekey()"
+    },
+    {
+      "label": "supabaseGet()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L74",
+      "id": "server_supabaseget",
+      "community": 2,
+      "norm_label": "supabaseget()"
+    },
+    {
+      "label": "supabaseSet()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L86",
+      "id": "server_supabaseset",
+      "community": 0,
+      "norm_label": "supabaseset()"
+    },
+    {
+      "label": "httpsGet()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L97",
+      "id": "server_httpsget",
+      "community": 2,
+      "norm_label": "httpsget()"
+    },
+    {
+      "label": "httpsPost()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L109",
+      "id": "server_httpspost",
+      "community": 0,
+      "norm_label": "httpspost()"
+    },
+    {
+      "label": "Engine",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L125",
+      "id": "server_engine",
+      "community": 1,
+      "norm_label": "engine"
+    },
+    {
+      "label": ".constructor()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L126",
+      "id": "server_engine_constructor",
+      "community": 1,
+      "norm_label": ".constructor()"
+    },
+    {
+      "label": "._start()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L134",
+      "id": "server_engine_start",
+      "community": 1,
+      "norm_label": "._start()"
+    },
+    {
+      "label": "._send()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L157",
+      "id": "server_engine_send",
+      "community": 1,
+      "norm_label": "._send()"
+    },
+    {
+      "label": "._onLine()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L161",
+      "id": "server_engine_online",
+      "community": 1,
+      "norm_label": "._online()"
+    },
+    {
+      "label": ".eval()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L189",
+      "id": "server_engine_eval",
+      "community": 1,
+      "norm_label": ".eval()"
+    },
+    {
+      "label": "checkRate()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L257",
+      "id": "server_checkrate",
+      "community": 0,
+      "norm_label": "checkrate()"
+    },
+    {
+      "label": "verifyJWT()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L267",
+      "id": "server_verifyjwt",
+      "community": 2,
+      "norm_label": "verifyjwt()"
+    },
+    {
+      "label": "json()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L294",
+      "id": "server_json",
+      "community": 0,
+      "norm_label": "json()"
+    },
+    {
+      "label": "keepalive.js",
+      "file_type": "code",
+      "source_file": "keepalive.js",
+      "source_location": "L1",
+      "id": "keepalive_js",
+      "community": 3,
+      "norm_label": "keepalive.js"
+    },
+    {
+      "label": "ping()",
+      "file_type": "code",
+      "source_file": "keepalive.js",
+      "source_location": "L7",
+      "id": "keepalive_ping",
+      "community": 3,
+      "norm_label": "ping()"
+    }
+  ],
+  "links": [
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L44",
+      "weight": 1.0,
+      "_src": "server_js",
+      "_tgt": "server_findstockfish",
+      "source": "server_js",
+      "target": "server_findstockfish",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L61",
+      "weight": 1.0,
+      "_src": "server_js",
+      "_tgt": "server_lruget",
+      "source": "server_js",
+      "target": "server_lruget",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L65",
+      "weight": 1.0,
+      "_src": "server_js",
+      "_tgt": "server_lruset",
+      "source": "server_js",
+      "target": "server_lruset",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L69",
+      "weight": 1.0,
+      "_src": "server_js",
+      "_tgt": "server_cachekey",
+      "source": "server_js",
+      "target": "server_cachekey",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L74",
+      "weight": 1.0,
+      "_src": "server_js",
+      "_tgt": "server_supabaseget",
+      "source": "server_js",
+      "target": "server_supabaseget",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L86",
+      "weight": 1.0,
+      "_src": "server_js",
+      "_tgt": "server_supabaseset",
+      "source": "server_js",
+      "target": "server_supabaseset",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L97",
+      "weight": 1.0,
+      "_src": "server_js",
+      "_tgt": "server_httpsget",
+      "source": "server_js",
+      "target": "server_httpsget",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L109",
+      "weight": 1.0,
+      "_src": "server_js",
+      "_tgt": "server_httpspost",
+      "source": "server_js",
+      "target": "server_httpspost",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L125",
+      "weight": 1.0,
+      "_src": "server_js",
+      "_tgt": "server_engine",
+      "source": "server_js",
+      "target": "server_engine",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L257",
+      "weight": 1.0,
+      "_src": "server_js",
+      "_tgt": "server_checkrate",
+      "source": "server_js",
+      "target": "server_checkrate",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L267",
+      "weight": 1.0,
+      "_src": "server_js",
+      "_tgt": "server_verifyjwt",
+      "source": "server_js",
+      "target": "server_verifyjwt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L294",
+      "weight": 1.0,
+      "_src": "server_js",
+      "_tgt": "server_json",
+      "source": "server_js",
+      "target": "server_json",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L78",
+      "weight": 1.0,
+      "_src": "server_supabaseget",
+      "_tgt": "server_httpsget",
+      "source": "server_supabaseget",
+      "target": "server_httpsget",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L89",
+      "weight": 1.0,
+      "_src": "server_supabaseset",
+      "_tgt": "server_httpspost",
+      "source": "server_supabaseset",
+      "target": "server_httpspost",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L270",
+      "weight": 1.0,
+      "_src": "server_verifyjwt",
+      "_tgt": "server_httpsget",
+      "source": "server_httpsget",
+      "target": "server_verifyjwt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L126",
+      "weight": 1.0,
+      "_src": "server_engine",
+      "_tgt": "server_engine_constructor",
+      "source": "server_engine",
+      "target": "server_engine_constructor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L134",
+      "weight": 1.0,
+      "_src": "server_engine",
+      "_tgt": "server_engine_start",
+      "source": "server_engine",
+      "target": "server_engine_start",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L157",
+      "weight": 1.0,
+      "_src": "server_engine",
+      "_tgt": "server_engine_send",
+      "source": "server_engine",
+      "target": "server_engine_send",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L161",
+      "weight": 1.0,
+      "_src": "server_engine",
+      "_tgt": "server_engine_online",
+      "source": "server_engine",
+      "target": "server_engine_online",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L189",
+      "weight": 1.0,
+      "_src": "server_engine",
+      "_tgt": "server_engine_eval",
+      "source": "server_engine",
+      "target": "server_engine_eval",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L131",
+      "weight": 1.0,
+      "_src": "server_engine_constructor",
+      "_tgt": "server_engine_start",
+      "source": "server_engine_constructor",
+      "target": "server_engine_start",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L151",
+      "weight": 1.0,
+      "_src": "server_engine_start",
+      "_tgt": "server_engine_send",
+      "source": "server_engine_start",
+      "target": "server_engine_send",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L166",
+      "weight": 1.0,
+      "_src": "server_engine_online",
+      "_tgt": "server_engine_send",
+      "source": "server_engine_send",
+      "target": "server_engine_online",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "keepalive.js",
+      "source_location": "L7",
+      "weight": 1.0,
+      "_src": "keepalive_js",
+      "_tgt": "keepalive_ping",
+      "source": "keepalive_js",
+      "target": "keepalive_ping",
+      "confidence_score": 1.0
+    }
+  ],
+  "hyperedges": []
+}

@@ -37,7 +37,7 @@ const RATE_PER_MIN      = parseInt(process.env.RATE_LIMIT_PER_MIN) || 60;
 const REQUIRE_AUTH      = process.env.REQUIRE_AUTH === 'true';
 const SUPABASE_URL      = process.env.SUPABASE_URL      || '';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
-const NUM_ENGINES       = 2; // dual pool
+const NUM_ENGINES       = parseInt(process.env.NUM_ENGINES) || 2;
 const LOCAL_CACHE_SIZE  = 150_000;
 
 // ── Stockfish path ────────────────────────────────────────────────────────────

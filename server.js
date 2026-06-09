@@ -187,6 +187,36 @@ class Engine {
       return;
     }
     if (!this.current) return;
+
+    // ── MultiPV mode: collect the top-N candidate moves + their PVs ──────────
+    if (this.current.multipv) {
+      if (line.startsWith('info')) {
+        const rankM = line.match(/ multipv (\d+)/);
+        const pvM   = line.match(/ pv (.+)$/);
+        if (!rankM || !pvM) return;            // need a ranked line with a PV
+        const cpM = line.match(/score cp (-?\d+)/);
+        const mM  = line.match(/score mate (-?\d+)/);
+        // Keep the LATEST (deepest) line per rank; cp/mate are side-to-move POV.
+        this.current.lines[parseInt(rankM[1])] = {
+          cp:   cpM ? parseInt(cpM[1]) : null,
+          mate: mM  ? parseInt(mM[1])  : null,
+          pv:   pvM[1].split(/\s+/),
+        };
+      } else if (line.startsWith('bestmove')) {
+        const { lines, resolve } = this.current;
+        const moves = Object.keys(lines).map(Number).sort((a, b) => a - b).map(k => {
+          const L = lines[k];
+          return { uci: L.pv[0], cp: L.cp, mate: L.mate, pv: L.pv };
+        });
+        this.current = null;
+        this.busy    = false;
+        resolve({ moves });                    // cp/mate are MOVER's POV (best first)
+        pool.drain();
+      }
+      return;
+    }
+
+    // ── Single-best mode (legacy /eval) ─────────────────────────────────────
     if (line.startsWith('info')) {
       const cpM = line.match(/score cp (-?\d+)/);
       const mM  = line.match(/score mate (-?\d+)/);
@@ -219,6 +249,34 @@ class Engine {
         fen, bestCp: null, bestMate: null,
         resolve: r => { clearTimeout(timer); resolve(r); },
       };
+      this._send('setoption name MultiPV 1');   // reset in case prior job was multi-PV
+      this._send(`position fen ${fen}`);
+      this._send(`go depth ${depth} movetime ${movetime}`);
+    });
+  }
+
+  /**
+   * Multi-PV search → top-N candidate MOVES with PVs. Returns
+   * { moves: [{ uci, cp, mate, pv }] } ranked best-first, cp/mate in the
+   * MOVER's POV (positive = good for the side to move). This is the data the
+   * decision-point style engine needs (Stockfish already produces it; the old
+   * single-PV path threw the moves away).
+   */
+  evalMultiPV(fen, depth, movetime, multipv) {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this._send('stop');
+        this.current = null; this.busy = false;
+        reject(new Error('Engine timeout'));
+        pool.drain();
+      }, movetime + 3000);
+
+      this.busy    = true;
+      this.current = {
+        fen, multipv, lines: {},
+        resolve: r => { clearTimeout(timer); resolve(r); },
+      };
+      this._send(`setoption name MultiPV ${multipv}`);
       this._send(`position fen ${fen}`);
       this._send(`go depth ${depth} movetime ${movetime}`);
     });
@@ -301,16 +359,29 @@ const pool = {
     });
   },
 
+  /** Multi-PV evaluation of a single position (no LRU/dedup — small volume). */
+  evalMultiPV(fen, depth, multipv) {
+    this._maybeScaleUp();
+    const movetime = getMovetime(this.queueDepth);
+    return new Promise((resolve, reject) => {
+      this.pending.push({ fen, depth, movetime, multipv, resolvers: [{ resolve, reject }] });
+      this.drain();
+    });
+  },
+
   drain() {
     if (!this.pending.length) return;
     const eng = this.engines.find(e => e.alive && e.ready && !e.busy);
     if (!eng) return;
     const job = this.pending.shift();
-    eng.eval(job.fen, job.depth, job.movetime).then(result => {
-      this.inflight.delete(job.key);
+    const run = job.multipv
+      ? eng.evalMultiPV(job.fen, job.depth, job.movetime, job.multipv)
+      : eng.eval(job.fen, job.depth, job.movetime);
+    run.then(result => {
+      if (job.key) this.inflight.delete(job.key);
       job.resolvers.forEach(r => r.resolve(result));
     }).catch(err => {
-      this.inflight.delete(job.key);
+      if (job.key) this.inflight.delete(job.key);
       job.resolvers.forEach(r => r.reject(err));
     });
   },
@@ -468,6 +539,53 @@ http.createServer(async (req, res) => {
         }));
 
         json(res, { results });
+      } catch (e) {
+        json(res, { error: e.message }, 500);
+      }
+    });
+    return;
+  }
+
+  // ── POST /eval-multipv ─────────────────────────────────────────────────────
+  // { fen, depth?, multipv? } → { moves: [{ uci, cp, mate, pv }] }
+  // Top-N candidate moves with PVs (cp/mate in MOVER's POV, best first). This is
+  // the substrate for decision-point / revealed-preference style analysis.
+  if (req.method === 'POST' && req.url === '/eval-multipv') {
+    lastRequestAt = Date.now();
+
+    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+    if (!checkRate(ip)) {
+      return json(res, { error: 'Rate limit exceeded — try again in 60s' }, 429);
+    }
+    const token = (req.headers['authorization'] || '').replace('Bearer ', '');
+    if (REQUIRE_AUTH && !(await verifyJWT(token))) {
+      return json(res, { error: 'Unauthorized' }, 401);
+    }
+
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { fen, depth: reqDepth, multipv: reqMpv } = JSON.parse(body);
+        if (typeof fen !== 'string' || !fen.includes(' ')) {
+          return json(res, { error: 'fen required' }, 400);
+        }
+        const multipv = Math.max(1, Math.min(6, reqMpv || 4));
+
+        const queueNow = pool.queueDepth;
+        const depthCap = queueNow >= 20 ? 14 : queueNow >= 8 ? 16 : 20;
+        const depth    = Math.max(10, Math.min(depthCap, reqDepth || DEFAULT_DEPTH));
+
+        if (pool.queueDepth + 1 > MAX_QUEUE) {
+          return json(res, { error: 'Server overloaded — use local engine', overloaded: true }, 503);
+        }
+
+        try {
+          const { moves } = await pool.evalMultiPV(fen, depth, multipv);
+          json(res, { moves, depth });
+        } catch (e) {
+          json(res, { moves: null, error: e.message }, 500);
+        }
       } catch (e) {
         json(res, { error: e.message }, 500);
       }

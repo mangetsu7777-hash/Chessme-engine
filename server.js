@@ -249,7 +249,7 @@ class Engine {
         fen, bestCp: null, bestMate: null,
         resolve: r => { clearTimeout(timer); resolve(r); },
       };
-      this._send('setoption name MultiPV 1');   // reset in case prior job was multi-PV
+      this._send('setoption name MultiPV value 1');   // reset in case prior job was multi-PV
       this._send(`position fen ${fen}`);
       this._send(`go depth ${depth} movetime ${movetime}`);
     });
@@ -276,7 +276,7 @@ class Engine {
         fen, multipv, lines: {},
         resolve: r => { clearTimeout(timer); resolve(r); },
       };
-      this._send(`setoption name MultiPV ${multipv}`);
+      this._send(`setoption name MultiPV value ${multipv}`);
       this._send(`position fen ${fen}`);
       this._send(`go depth ${depth} movetime ${movetime}`);
     });
